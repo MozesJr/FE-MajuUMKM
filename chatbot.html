@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Chatbot - AnythingLLM</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React & ReactDOM -->
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+          "Helvetica Neue", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: rgba(30, 27, 75, 0.3);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(147, 51, 234, 0.5);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(147, 51, 234, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useRef, useEffect } = React;
+
+      // Lucide Icons as React components
+      const Send = ({ className = "w-6 h-6" }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+          />
+        </svg>
+      );
+
+      const MessageSquare = ({ className = "w-6 h-6" }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          />
+        </svg>
+      );
+
+      const Settings = ({ className = "w-6 h-6" }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        </svg>
+      );
+
+      const Loader2 = ({ className = "w-6 h-6" }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      );
+
+      const Sparkles = ({ className = "w-6 h-6" }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+          />
+        </svg>
+      );
+
+      const ChatbotApp = () => {
+        const [messages, setMessages] = useState([]);
+        const [inputMessage, setInputMessage] = useState("");
+        const [isLoading, setIsLoading] = useState(false);
+        const [apiConfig, setApiConfig] = useState({
+          baseUrl: "http://localhost:3001",
+          workspaceSlug: "default-workspace",
+          threadSlug: null,
+        });
+        const [showSettings, setShowSettings] = useState(false);
+        const messagesEndRef = useRef(null);
+
+        const scrollToBottom = () => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        };
+
+        useEffect(() => {
+          scrollToBottom();
+        }, [messages]);
+
+        useEffect(() => {
+          initializeThread();
+        }, []);
+
+        const initializeThread = async () => {
+          try {
+            const response = await fetch(
+              `${apiConfig.baseUrl}/v1/workspace/${apiConfig.workspaceSlug}/thread/new`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              setApiConfig((prev) => ({
+                ...prev,
+                threadSlug: data.thread?.slug || "new-thread",
+              }));
+            }
+          } catch (error) {
+            console.error("Error initializing thread:", error);
+            setApiConfig((prev) => ({
+              ...prev,
+              threadSlug: "fallback-thread",
+            }));
+          }
+        };
+
+        const sendMessage = async () => {
+          if (!inputMessage.trim() || isLoading) return;
+
+          const userMessage = {
+            role: "user",
+            content: inputMessage,
+            timestamp: new Date().toISOString(),
+          };
+
+          setMessages((prev) => [...prev, userMessage]);
+          setInputMessage("");
+          setIsLoading(true);
+
+          try {
+            const response = await fetch(
+              `${apiConfig.baseUrl}/v1/workspace/${apiConfig.workspaceSlug}/stream-chat`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  message: inputMessage,
+                  mode: "chat",
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error("Failed to send message");
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let assistantMessage = {
+              role: "assistant",
+              content: "",
+              timestamp: new Date().toISOString(),
+            };
+
+            setMessages((prev) => [...prev, assistantMessage]);
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              const lines = chunk.split("\n");
+
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.textResponse) {
+                      assistantMessage.content += data.textResponse;
+                      setMessages((prev) => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                          ...assistantMessage,
+                        };
+                        return newMessages;
+                      });
+                    }
+                  } catch (e) {
+                    // Skip invalid JSON
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error sending message:", error);
+
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content:
+                  "Sorry, I encountered an error. Please check your API configuration and try again.",
+                timestamp: new Date().toISOString(),
+                isError: true,
+              },
+            ]);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        const handleKeyPress = (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
+        };
+
+        return (
+          <div className="flex flex-col h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+            <div className="bg-slate-800/50 backdrop-blur-sm border-b border-purple-500/20 px-6 py-4">
+              <div className="flex items-center justify-between max-w-6xl mx-auto">
+                <div className="flex items-center gap-3">
+                  <div className="bg-purple-600 p-2 rounded-lg">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white">AI Chatbot</h1>
+                    <p className="text-sm text-purple-300">
+                      Powered by AnythingLLM
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <Settings className="w-5 h-5 text-purple-300" />
+                </button>
+              </div>
+            </div>
+
+            {showSettings && (
+              <div className="bg-slate-800/90 backdrop-blur-sm border-b border-purple-500/20 px-6 py-4">
+                <div className="max-w-6xl mx-auto space-y-3">
+                  <h3 className="text-white font-semibold mb-2">
+                    API Configuration
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm text-purple-300 block mb-1">
+                        Base URL
+                      </label>
+                      <input
+                        type="text"
+                        value={apiConfig.baseUrl}
+                        onChange={(e) =>
+                          setApiConfig((prev) => ({
+                            ...prev,
+                            baseUrl: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                        placeholder="http://localhost:3001"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-purple-300 block mb-1">
+                        Workspace Slug
+                      </label>
+                      <input
+                        type="text"
+                        value={apiConfig.workspaceSlug}
+                        onChange={(e) =>
+                          setApiConfig((prev) => ({
+                            ...prev,
+                            workspaceSlug: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                        placeholder="default-workspace"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={initializeThread}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Reinitialize Thread
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="max-w-4xl mx-auto space-y-6">
+                {messages.length === 0 ? (
+                  <div className="text-center py-12">
+                    <MessageSquare className="w-16 h-16 text-purple-400 mx-auto mb-4 opacity-50" />
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Start a Conversation
+                    </h2>
+                    <p className="text-purple-300">
+                      Ask me anything and I'll help you out!
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${
+                        message.role === "user"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-6 py-4 ${
+                          message.role === "user"
+                            ? "bg-purple-600 text-white"
+                            : message.isError
+                            ? "bg-red-500/20 text-red-200 border border-red-500/30"
+                            : "bg-slate-800 text-white border border-purple-500/20"
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words leading-relaxed">
+                          {message.content}
+                        </p>
+                        <span className="text-xs opacity-60 mt-2 block">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-slate-800 border border-purple-500/20 rounded-2xl px-6 py-4">
+                      <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 backdrop-blur-sm border-t border-purple-500/20 px-6 py-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1 bg-slate-800 border border-purple-500/30 rounded-2xl overflow-hidden focus-within:border-purple-500">
+                    <textarea
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Type your message here..."
+                      rows="1"
+                      className="w-full px-6 py-4 bg-transparent text-white placeholder-purple-300/50 focus:outline-none resize-none max-h-32"
+                      style={{ minHeight: "56px" }}
+                    />
+                  </div>
+                  <button
+                    onClick={sendMessage}
+                    disabled={!inputMessage.trim() || isLoading}
+                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white p-4 rounded-2xl transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-purple-300/50 mt-2 text-center">
+                  Press Enter to send • Shift + Enter for new line
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<ChatbotApp />);
+    </script>
+  </body>
+</html>
