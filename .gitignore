@@ -1,0 +1,90 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json     # hapus baris ini kalau kamu mau commit lockfile
+.pnpm-debug.log*
+
+# Vite / build output
+dist/
+build/
+.vite/
+
+# Environment files (sebaiknya jangan commit)
+.env
+.env.*            # .env.local, .env.production, dll
+.env.local
+.env.*.local
+
+# Editor / OS files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+Thumbs.db
+
+# Logs and temporary
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+.tmp
+.temp
+
+# cache / coverage
+.cache
+coverage/
+coverage-*.json
+
+# Testing
+jest-cache/
+.jest/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc build tools
+.cache-loader
+parcel-cache/
+.cache/
+dist-ssr/
+
+# Storybook
+storybook-static/
+
+# Next / frameworks artefacts (safe to ignore even if not used)
+.next/
+out/
+
+# IDEs
+*.swp
+*~.nib
+*.orig
+
+# Mac / Linux trash
+.Trash-*
+desktop.ini
+
+# Generated assets / images / uploads
+uploads/
+public/uploads/
+tmp/
+temp/
+
+# Docker
+docker-compose.override.yml
+docker-compose.*.yml
+
+# Optional: lockfiles from other package managers (uncomment if you DON'T want to commit them)
+# pnpm-lock.yaml
+# yarn.lock
+
+# Optional: keep sensitive files out
+secrets/
+credentials.json
