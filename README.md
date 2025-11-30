@@ -46,7 +46,7 @@ Platform chatbot berbasis AI untuk membantu Usaha Kecil dan Menengah (UKM) Indon
 
 ### Backend Integration
 
-- **AnythingLLM Developer API** - LLM backend
+- **MajuUKM Developer API** - LLM backend
 - **Server-Sent Events (SSE)** - Real-time streaming
 - **REST API** - Workspace & thread management
 
@@ -83,7 +83,7 @@ Edit `src/components/ChatInterface.jsx` untuk mengatur API configuration:
 ```javascript
 const [apiConfig, setApiConfig] = useState({
   baseUrl: "http://localhost:3001", // Backend URL
-  apiKey: "YOUR_API_KEY_HERE", // API Key dari AnythingLLM
+  apiKey: "YOUR_API_KEY_HERE", // API Key dari MajuUKM
   threadSlugs: {},
 });
 ```
@@ -490,7 +490,7 @@ MIT License - bebas digunakan untuk project apapun.
 
 - **Developer** - Your Name
 - **Designer** - Your Name
-- **Backend** - AnythingLLM
+- **Backend** - MajuUKM
 
 ---
 
@@ -507,7 +507,7 @@ Jika ada pertanyaan atau masalah:
 
 ## 🙏 Acknowledgments
 
-- [AnythingLLM](https://useanything.com) - Backend LLM platform
+- [MajuUKM](https://useanything.com) - Backend LLM platform
 - [React](https://react.dev) - UI library
 - [Tailwind CSS](https://tailwindcss.com) - CSS framework
 - [Lucide](https://lucide.dev) - Icon set

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Sparkles, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, UserPlus } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
   const [username, setUsername] = useState("");
@@ -8,19 +9,25 @@ function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const result = await login(username, password);
+    try {
+      const result = await login(username, password);
 
-    if (!result.success) {
-      setError(result.error);
+      if (!result.success) {
+        setError(result.error || "Login gagal");
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan saat login. Cek console untuk detail.");
+      console.error("Login error:", err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -42,7 +49,12 @@ function Login() {
             {error && (
               <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-200">{error}</p>
+                <div className="flex-1">
+                  <p className="text-sm text-red-200">{error}</p>
+                  <p className="text-xs text-red-300 mt-1">
+                    Pastikan username sesuai dengan database MajuUKM
+                  </p>
+                </div>
               </div>
             )}
 
@@ -93,32 +105,30 @@ function Login() {
             </button>
           </form>
 
-          {/* Demo Credentials */}
+          {/* Register Section */}
           <div className="mt-6 pt-6 border-t border-slate-700">
-            <p className="text-sm text-purple-300 mb-3 font-medium">
-              Demo Credentials:
-            </p>
-            <div className="space-y-2 text-sm">
-              <div className="bg-slate-700/50 rounded-lg p-3">
-                <p className="text-purple-400 font-medium mb-1">User Role:</p>
-                <p className="text-slate-300">
-                  Username: <span className="text-white">user</span>
-                </p>
-                <p className="text-slate-300">
-                  Password: <span className="text-white">user123</span>
-                </p>
-              </div>
-              <div className="bg-slate-700/50 rounded-lg p-3">
-                <p className="text-purple-400 font-medium mb-1">Admin Role:</p>
-                <p className="text-slate-300">
-                  Username: <span className="text-white">admin</span>
-                </p>
-                <p className="text-slate-300">
-                  Password: <span className="text-white">admin123</span>
-                </p>
-              </div>
+            <div className="text-center mb-4">
+              <p className="text-sm text-purple-300">Belum punya akun?</p>
             </div>
+            <button
+              onClick={() => navigate("/register")}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group"
+            >
+              <UserPlus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span>Daftar Sekarang</span>
+            </button>
+            <p className="text-xs text-purple-400 text-center mt-3">
+              Daftar gratis dan mulai konsultasi bisnis UMKM Anda
+            </p>
           </div>
+        </div>
+
+        {/* Info Box */}
+        <div className="mt-6 bg-purple-900/30 backdrop-blur-sm rounded-xl p-4 border border-purple-500/20">
+          <p className="text-sm text-purple-300 text-center">
+            💡 <strong>Tips:</strong> Setelah registrasi, cek email untuk
+            verifikasi akun
+          </p>
         </div>
       </div>
     </div>

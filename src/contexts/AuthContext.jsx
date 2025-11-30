@@ -35,14 +35,30 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     apiLogout();
     setUser(null);
+    window.location.href = "/";
   };
 
   const isAdmin = () => {
     return user?.role === "admin";
   };
 
+  const updateUserData = (newData) => {
+    const updatedUser = { ...user, ...newData };
+    setUser(updatedUser);
+    saveUser(updatedUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isAdmin,
+        loading,
+        updateUserData,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

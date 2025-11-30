@@ -1,324 +1,366 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Send,
-  MessageSquare,
-  Settings,
   Loader2,
-  Sparkles,
   Menu,
   X,
   LogOut,
-  User,
   Shield,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import ThreadList from "./ThreadList";
+import {
+  getAllWorkspaces,
+  getThreadChats,
+  createNewThread,
+  streamChatToThread,
+} from "../utils/anythingllm";
 
 function ChatInterface() {
   const { user, logout, isAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  // Workspace & Thread State
   const [workspaces, setWorkspaces] = useState([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const [messages, setMessages] = useState({});
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
+  const [currentWorkspace, setCurrentWorkspace] = useState(null);
+  const [currentThread, setCurrentThread] = useState(null);
+  const [messages, setMessages] = useState([]);
+
+  // UI State
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [apiConfig, setApiConfig] = useState({
-    baseUrl: "http://localhost:3001/api",
-    apiKey: "EQRKDSV-2Z14ES5-P9CB67B-NP7R0JS",
-    threadSlugs: {},
-  });
-  const [showSettings, setShowSettings] = useState(false);
+  const [error, setError] = useState("");
+
+  // Refs
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Load workspaces on mount
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, selectedWorkspace]);
-
-  useEffect(() => {
-    fetchWorkspaces();
+    loadWorkspaces();
   }, []);
 
+  // Initialize workspace when selected
   useEffect(() => {
-    if (selectedWorkspace && !apiConfig.threadSlugs[selectedWorkspace.slug]) {
-      initializeThread(selectedWorkspace.slug);
+    if (currentWorkspace) {
+      initializeWorkspace();
     }
-  }, [selectedWorkspace]);
+  }, [currentWorkspace]);
 
-  const getHeaders = () => {
-    return {
-      accept: "application/json",
-      Authorization: `Bearer ${apiConfig.apiKey}`,
-    };
-  };
+  // Load messages when thread changes
+  useEffect(() => {
+    if (currentThread) {
+      loadThreadMessages();
+    }
+  }, [currentThread]);
 
-  const fetchWorkspaces = async () => {
+  // Auto-scroll
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const loadWorkspaces = async () => {
     try {
-      const response = await fetch(`${apiConfig.baseUrl}/v1/workspaces`, {
-        headers: getHeaders(),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setWorkspaces(data.workspaces || []);
-        if (data.workspaces && data.workspaces.length > 0) {
-          setSelectedWorkspace(data.workspaces[0]);
-        }
+      setLoadingWorkspaces(true);
+      const workspaceList = await getAllWorkspaces();
+
+      console.log("📋 Loaded workspaces:", workspaceList);
+
+      setWorkspaces(workspaceList);
+
+      // Set first workspace as default
+      if (workspaceList.length > 0) {
+        setCurrentWorkspace(workspaceList[0]);
       } else {
-        console.error("Failed to fetch workspaces:", response.status);
+        setError("Tidak ada workspace yang tersedia");
       }
     } catch (error) {
-      console.error("Error fetching workspaces:", error);
+      console.error("Failed to load workspaces:", error);
+      setError("Gagal memuat workspace");
+    } finally {
+      setLoadingWorkspaces(false);
     }
   };
 
-  const initializeThread = async (workspaceSlug) => {
+  const initializeWorkspace = async () => {
     try {
-      const response = await fetch(
-        `${apiConfig.baseUrl}/v1/workspace/${workspaceSlug}/thread/new`,
-        {
-          method: "POST",
-          headers: getHeaders(),
-        }
-      );
+      setIsLoading(true);
+      setMessages([]);
+      setError("");
 
-      if (response.ok) {
-        const data = await response.json();
-        setApiConfig((prev) => ({
-          ...prev,
-          threadSlugs: {
-            ...prev.threadSlugs,
-            [workspaceSlug]: data.thread?.slug || "new-thread",
-          },
-        }));
-        console.log(
-          "Thread initialized for",
-          workspaceSlug,
-          ":",
-          data.thread?.slug
-        );
-      }
-    } catch (error) {
-      console.error("Error initializing thread:", error);
-      setApiConfig((prev) => ({
-        ...prev,
-        threadSlugs: {
-          ...prev.threadSlugs,
-          [workspaceSlug]: "fallback-thread",
+      console.log(`🔄 Initializing workspace: ${currentWorkspace.slug}`);
+
+      // Create new thread for workspace
+      const newThread = await createNewThread(currentWorkspace.slug);
+      setCurrentThread(newThread.thread);
+
+      // Add welcome message
+      setMessages([
+        {
+          role: "assistant",
+          content: `Selamat datang di **${currentWorkspace.name}**! 👋\n\nSaya siap membantu Anda. Silakan ajukan pertanyaan Anda.`,
+          timestamp: new Date().toISOString(),
         },
-      }));
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !selectedWorkspace) return;
-
-    const workspaceSlug = selectedWorkspace.slug;
-    const userMessage = {
-      role: "user",
-      content: inputMessage,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [workspaceSlug]: [...(prev[workspaceSlug] || []), userMessage],
-    }));
-
-    const messageToSend = inputMessage;
-    setInputMessage("");
-    setIsLoading(true);
-
-    try {
-      const response = await fetch(
-        `${apiConfig.baseUrl}/v1/workspace/${workspaceSlug}/stream-chat`,
-        {
-          method: "POST",
-          headers: getHeaders(),
-          body: JSON.stringify({
-            message: messageToSend,
-            mode: "chat",
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = {
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => ({
-        ...prev,
-        [workspaceSlug]: [...(prev[workspaceSlug] || []), assistantMessage],
-      }));
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.textResponse) {
-                assistantMessage.content += data.textResponse;
-                setMessages((prev) => {
-                  const workspaceMessages = [...(prev[workspaceSlug] || [])];
-                  workspaceMessages[workspaceMessages.length - 1] = {
-                    ...assistantMessage,
-                  };
-                  return {
-                    ...prev,
-                    [workspaceSlug]: workspaceMessages,
-                  };
-                });
-              }
-            } catch (e) {
-              console.debug("Skipping invalid JSON chunk");
-            }
-          }
-        }
-      }
+      ]);
     } catch (error) {
-      console.error("Error sending message:", error);
-
-      setMessages((prev) => ({
-        ...prev,
-        [workspaceSlug]: [
-          ...(prev[workspaceSlug] || []),
-          {
-            role: "assistant",
-            content: `Error: ${error.message}\n\nPlease check your configuration.`,
-            timestamp: new Date().toISOString(),
-            isError: true,
-          },
-        ],
-      }));
+      console.error("Failed to initialize workspace:", error);
+      setError(`Gagal memuat workspace: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  const loadThreadMessages = async () => {
+    if (!currentThread) return;
+
+    try {
+      setIsLoading(true);
+      setError("");
+
+      console.log(`📥 Loading messages from thread: ${currentThread.slug}`);
+
+      const data = await getThreadChats(
+        currentWorkspace.slug,
+        currentThread.slug
+      );
+
+      console.log("Raw chat data:", data);
+
+      // Convert to message format
+      // AnythingLLM returns { history: [{role, content, ...}] }
+      const formattedMessages =
+        data.history?.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.createdAt || new Date().toISOString(),
+        })) || [];
+
+      console.log("Formatted messages:", formattedMessages);
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+      setError(`Gagal memuat riwayat chat: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const currentMessages = selectedWorkspace
-    ? messages[selectedWorkspace.slug] || []
-    : [];
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isLoading || !currentThread) return;
+
+    const userMessage = inputMessage.trim();
+    setInputMessage("");
+    setError("");
+
+    // Add user message
+    const newUserMessage = {
+      role: "user",
+      content: userMessage,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, newUserMessage]);
+    setIsLoading(true);
+
+    try {
+      // Add placeholder for assistant
+      const assistantMessageIndex = messages.length + 1;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "",
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+        },
+      ]);
+
+      // Stream response
+      let fullResponse = "";
+
+      await streamChatToThread(
+        currentWorkspace.slug,
+        currentThread.slug,
+        userMessage,
+        (data) => {
+          if (data.textResponse) {
+            fullResponse += data.textResponse;
+
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[assistantMessageIndex] = {
+                role: "assistant",
+                content: fullResponse,
+                timestamp: new Date().toISOString(),
+                isStreaming: true,
+              };
+              return updated;
+            });
+          }
+        }
+      );
+
+      // Mark complete
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated[assistantMessageIndex]) {
+          updated[assistantMessageIndex].isStreaming = false;
+        }
+        return updated;
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setError(`Gagal mengirim pesan: ${error.message}`);
+      setMessages((prev) => prev.slice(0, -1));
+    } finally {
+      setIsLoading(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleNewThread = async (newThread) => {
+    setCurrentThread(newThread);
+    setMessages([
+      {
+        role: "assistant",
+        content: `Thread baru dimulai! Silakan ajukan pertanyaan Anda.`,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  const handleThreadSelect = async (thread) => {
+    setCurrentThread(thread);
+  };
+
+  const handleWorkspaceChange = (workspace) => {
+    setCurrentWorkspace(workspace);
+    setCurrentThread(null);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
+
+  // Loading state
+  if (loadingWorkspaces) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 text-purple-400 animate-spin mx-auto mb-4" />
+          <p className="text-white text-xl">Memuat workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Sidebar */}
       <div
-        className={`${
-          isSidebarOpen ? "w-80" : "w-0"
-        } transition-all duration-300 bg-slate-800/50 backdrop-blur-sm border-r border-purple-500/20 overflow-hidden flex flex-col`}
+        className={`
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        fixed lg:relative lg:translate-x-0
+        w-80 h-full bg-slate-800 border-r border-slate-700
+        transition-transform duration-300 ease-in-out z-30
+        flex flex-col
+      `}
       >
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-purple-500/20">
+        {/* User Info */}
+        <div className="p-4 border-b border-slate-700">
           <div className="flex items-center gap-3 mb-4">
-            <div className="bg-purple-600 p-2 rounded-lg">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-white">MajuUKM</h2>
-              <p className="text-xs text-purple-300">Pilih Modul</p>
-            </div>
-          </div>
-
-          {/* User Info */}
-          <div className="bg-slate-700/50 rounded-lg p-3 flex items-center gap-3">
-            <div
-              className={`p-2 rounded-lg ${
-                isAdmin() ? "bg-amber-500/20" : "bg-purple-500/20"
-              }`}
-            >
-              {isAdmin() ? (
-                <Shield className="w-4 h-4 text-amber-400" />
-              ) : (
-                <User className="w-4 h-4 text-purple-400" />
-              )}
+            <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold">
+                {user?.username?.[0]?.toUpperCase() || "U"}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {user?.name}
+              <p className="text-white font-medium truncate">
+                {user?.username}
               </p>
-              <p className="text-xs text-purple-300 capitalize">{user?.role}</p>
+              <div className="flex items-center gap-1">
+                {user?.role === "admin" ? (
+                  <>
+                    <Shield className="w-3 h-3 text-amber-400" />
+                    <span className="text-xs text-amber-400">Admin</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-purple-400">User</span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Workspace List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {workspaces.length === 0 ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-purple-300">Loading workspaces...</p>
-            </div>
-          ) : (
-            workspaces.map((workspace) => (
-              <button
-                key={workspace.id}
-                onClick={() => setSelectedWorkspace(workspace)}
-                className={`w-full text-left p-3 rounded-lg transition-all ${
-                  selectedWorkspace?.id === workspace.id
-                    ? "bg-purple-600 text-white"
-                    : "bg-slate-700/50 text-purple-300 hover:bg-slate-700"
-                }`}
-              >
-                <div className="font-semibold text-sm mb-1">
-                  {workspace.name}
-                </div>
-                <div className="text-xs opacity-70">
-                  {workspace.chatModel || "Default Model"}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-purple-500/20 space-y-2">
+          {/* Admin Panel Button */}
           {isAdmin() && (
             <button
-              onClick={() => (window.location.href = "/admin")}
-              className="w-full flex items-center gap-2 p-2 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors"
+              onClick={() => navigate("/admin")}
+              className="w-full flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors text-sm mb-2"
             >
               <Shield className="w-4 h-4" />
-              <span className="text-sm">Admin Panel</span>
+              <span>Admin Panel</span>
             </button>
           )}
-          {isAdmin() && (
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="w-full flex items-center gap-2 p-2 rounded-lg bg-slate-700/50 text-purple-300 hover:bg-slate-700 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-sm">Settings</span>
-            </button>
-          )}
+        </div>
 
+        {/* Workspace Selector */}
+        {workspaces.length > 0 && currentWorkspace && (
+          <div className="p-4 border-b border-slate-700">
+            <label className="block text-xs text-slate-400 mb-2">
+              PILIH MODUL
+            </label>
+            <select
+              value={currentWorkspace?.slug || ""}
+              onChange={(e) => {
+                const workspace = workspaces.find(
+                  (w) => w.slug === e.target.value
+                );
+                if (workspace) handleWorkspaceChange(workspace);
+              }}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+            >
+              {workspaces.map((workspace) => (
+                <option key={workspace.slug} value={workspace.slug}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Thread List */}
+        {currentWorkspace && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <label className="block text-xs text-slate-400 mb-2">
+              RIWAYAT CHAT
+            </label>
+            <ThreadList
+              workspaceSlug={currentWorkspace.slug}
+              currentThreadSlug={currentThread?.slug}
+              onThreadSelect={handleThreadSelect}
+              onNewThread={handleNewThread}
+            />
+          </div>
+        )}
+
+        {/* Logout */}
+        <div className="p-4 border-t border-slate-700">
           <button
-            onClick={logout}
-            className="w-full flex items-center gap-2 p-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            <span className="text-sm">Logout</span>
+            <span>Logout</span>
           </button>
         </div>
       </div>
@@ -326,194 +368,141 @@ function ChatInterface() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border-b border-purple-500/20 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                {isSidebarOpen ? (
-                  <X className="w-5 h-5 text-purple-300 lg:hidden" />
-                ) : (
-                  <Menu className="w-5 h-5 text-purple-300" />
-                )}
-              </button>
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors hidden lg:block"
-              >
-                <Menu className="w-5 h-5 text-purple-300" />
-              </button>
-              {selectedWorkspace && (
-                <div>
-                  <h1 className="text-xl font-bold text-white">
-                    {selectedWorkspace.name}
-                  </h1>
-                  <p className="text-sm text-purple-300">
-                    {selectedWorkspace.chatMode === "chat"
-                      ? "Chat Mode"
-                      : "Query Mode"}
-                  </p>
-                </div>
-              )}
-            </div>
+        <div className="bg-slate-800 border-b border-slate-700 p-4 flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            {isSidebarOpen ? (
+              <X className="w-5 h-5 text-white" />
+            ) : (
+              <Menu className="w-5 h-5 text-white" />
+            )}
+          </button>
+
+          <div className="flex-1">
+            <h1 className="text-white font-bold text-lg">
+              {currentWorkspace?.name || "MajuUKM"}
+            </h1>
+            <p className="text-purple-300 text-sm">
+              {currentWorkspace?.slug || "Loading..."}
+            </p>
           </div>
+
+          {currentThread && (
+            <button
+              onClick={() => initializeWorkspace()}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            >
+              <MessageSquarePlus className="w-4 h-4" />
+              <span>Thread Baru</span>
+            </button>
+          )}
         </div>
 
-        {/* Settings Panel */}
-        {showSettings && (
-          <div className="bg-slate-800/90 backdrop-blur-sm border-b border-purple-500/20 px-6 py-4">
-            <div className="max-w-6xl mx-auto space-y-3">
-              <h3 className="text-white font-semibold mb-2">
-                API Configuration
-              </h3>
-              <div>
-                <label className="text-sm text-purple-300 block mb-1">
-                  Base URL
-                </label>
-                <input
-                  type="text"
-                  value={apiConfig.baseUrl}
-                  onChange={(e) =>
-                    setApiConfig((prev) => ({
-                      ...prev,
-                      baseUrl: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  placeholder="http://localhost:3001"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-purple-300 block mb-1">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={apiConfig.apiKey}
-                  onChange={(e) =>
-                    setApiConfig((prev) => ({
-                      ...prev,
-                      apiKey: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  placeholder="Your API Key"
-                />
-              </div>
-              <button
-                onClick={fetchWorkspaces}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`
+                max-w-[80%] rounded-2xl px-4 py-3
+                ${
+                  message.role === "user"
+                    ? "bg-purple-600 text-white"
+                    : "bg-slate-700 text-slate-100"
+                }
+              `}
               >
-                Reload Workspaces
-              </button>
+                <div className="prose prose-invert max-w-none">
+                  {message.content.split("\n").map((line, i) => (
+                    <p key={i} className="mb-2 last:mb-0">
+                      {line
+                        .split("**")
+                        .map((part, j) =>
+                          j % 2 === 0 ? part : <strong key={j}>{part}</strong>
+                        )}
+                    </p>
+                  ))}
+                </div>
+                {message.isStreaming && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <div
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
+          ))}
+
+          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+            <div className="flex justify-start">
+              <div className="bg-slate-700 rounded-2xl px-4 py-3">
+                <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mx-4 mb-2 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            {error}
           </div>
         )}
 
-        {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {!selectedWorkspace ? (
-              <div className="text-center py-12">
-                <MessageSquare className="w-16 h-16 text-purple-400 mx-auto mb-4 opacity-50" />
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Pilih Modul
-                </h2>
-                <p className="text-purple-300">
-                  Pilih salah satu modul di sidebar untuk mulai chat
-                </p>
-              </div>
-            ) : currentMessages.length === 0 ? (
-              <div className="text-center py-12">
-                <MessageSquare className="w-16 h-16 text-purple-400 mx-auto mb-4 opacity-50" />
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Mulai Percakapan dengan {selectedWorkspace.name}
-                </h2>
-                <p className="text-purple-300 max-w-2xl mx-auto text-sm">
-                  {selectedWorkspace.openAiPrompt?.split("\n")[0] ||
-                    "Tanyakan apa saja!"}
-                </p>
-              </div>
-            ) : (
-              currentMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-6 py-4 ${
-                      message.role === "user"
-                        ? "bg-purple-600 text-white"
-                        : message.isError
-                        ? "bg-red-500/20 text-red-200 border border-red-500/30"
-                        : "bg-slate-800 text-white border border-purple-500/20"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words leading-relaxed">
-                      {message.content}
-                    </p>
-                    <span className="text-xs opacity-60 mt-2 block">
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 border border-purple-500/20 rounded-2xl px-6 py-4">
-                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border-t border-purple-500/20 px-6 py-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-3 items-end">
-              <div className="flex-1 bg-slate-800 border border-purple-500/30 rounded-2xl overflow-hidden focus-within:border-purple-500">
-                <textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={
-                    selectedWorkspace
-                      ? "Ketik pesan Anda di sini..."
-                      : "Pilih workspace dulu..."
-                  }
-                  rows="1"
-                  disabled={!selectedWorkspace}
-                  className="w-full px-6 py-4 bg-transparent text-white placeholder-purple-300/50 focus:outline-none resize-none max-h-32 disabled:opacity-50"
-                  style={{ minHeight: "56px" }}
-                />
-              </div>
-              <button
-                onClick={sendMessage}
-                disabled={
-                  !inputMessage.trim() || isLoading || !selectedWorkspace
-                }
-                className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white p-4 rounded-2xl transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-purple-300/50 mt-2 text-center">
-              Press Enter untuk kirim • Shift + Enter untuk baris baru
-            </p>
+        {/* Input */}
+        <div className="p-4 bg-slate-800 border-t border-slate-700">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder="Ketik pertanyaan Anda..."
+              disabled={isLoading || !currentThread}
+              className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={isLoading || !inputMessage.trim() || !currentThread}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Overlay */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-20"
+        />
+      )}
     </div>
   );
 }

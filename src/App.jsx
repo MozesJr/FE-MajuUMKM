@@ -1,45 +1,68 @@
 import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./components/Login";
+import Register from "./components/Register";
+import VerifyEmail from "./components/VerifyEmail";
 import ChatInterface from "./components/ChatInterface";
 import AdminPanel from "./components/AdminPanel";
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
 
-  // Show loading state
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading...</p>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-white text-xl font-medium">Loading MajuUKM...</p>
         </div>
       </div>
     );
   }
 
-  // Not authenticated - show login
-  if (!user) {
-    return <Login />;
-  }
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route
+        path="/"
+        element={user ? <Navigate to="/chat" replace /> : <Login />}
+      />
 
-  // Check if admin panel route
-  const isAdminRoute = window.location.pathname === "/admin";
+      <Route
+        path="/register"
+        element={user ? <Navigate to="/chat" replace /> : <Register />}
+      />
 
-  // Show admin panel if admin and on admin route
-  if (isAdminRoute && user.role === "admin") {
-    return <AdminPanel />;
-  }
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
-  // Redirect non-admin away from admin route
-  if (isAdminRoute && user.role !== "admin") {
-    window.location.href = "/";
-    return null;
-  }
+      {/* Protected Routes - User Must Be Logged In */}
+      <Route
+        path="/chat"
+        element={user ? <ChatInterface /> : <Navigate to="/" replace />}
+      />
 
-  // Show chat interface for authenticated users
-  return <ChatInterface />;
+      {/* Admin Routes - User Must Be Admin */}
+      <Route
+        path="/admin"
+        element={
+          user ? (
+            isAdmin() ? (
+              <AdminPanel />
+            ) : (
+              <Navigate to="/chat" replace />
+            )
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+
+      {/* Catch All - Redirect to Home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
 export default App;

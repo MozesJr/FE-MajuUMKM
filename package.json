@@ -1,17 +1,22 @@
 {
-  "name": "anythingllm-chatbot-frontend",
+  "name": "MajuUKM-chatbot-frontend",
   "version": "1.0.0",
   "type": "module",
-  "description": "Frontend chatbot untuk AnythingLLM API",
+  "description": "Frontend chatbot untuk MajuUKM API",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "crypto": "^1.0.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.309.0",
+    "nodemailer": "^7.0.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "lucide-react": "^0.309.0"
+    "react-router-dom": "^6.30.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
