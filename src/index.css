@@ -28,3 +28,20 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(147, 51, 234, 0.7);
 }
+
+/* Markdown styles */
+.prose ul {
+    padding-left: 1.5rem;
+}
+
+.prose ol {
+    padding-left: 1.5rem;
+}
+
+.prose li {
+    margin-bottom: 0.25rem;
+}
+
+.prose code {
+    font-family: 'Courier New', monospace;
+}

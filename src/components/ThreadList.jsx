@@ -17,7 +17,9 @@ function ThreadList({
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    loadThreads();
+    if (workspaceSlug) {
+      loadThreads();
+    }
   }, [workspaceSlug]);
 
   const loadThreads = async () => {
@@ -25,14 +27,24 @@ function ThreadList({
       setLoading(true);
       const data = await getWorkspaceThreads(workspaceSlug);
 
-      // AnythingLLM returns threads array directly in workspace data
-      // or { threads: [...] }
-      const threadList = Array.isArray(data) ? data : data.threads || [];
+      console.log("Raw threads data:", data);
 
-      console.log("Thread list loaded:", threadList);
+      // Handle different response structures
+      let threadList = [];
+
+      if (data.threads && Array.isArray(data.threads)) {
+        threadList = data.threads;
+      } else if (data.workspace && data.workspace.threads) {
+        threadList = data.workspace.threads;
+      } else if (Array.isArray(data)) {
+        threadList = data;
+      }
+
+      console.log("Parsed thread list:", threadList);
       setThreads(threadList);
     } catch (error) {
       console.error("Failed to load threads:", error);
+      setThreads([]);
     } finally {
       setLoading(false);
     }
@@ -41,16 +53,20 @@ function ThreadList({
   const handleNewThread = async () => {
     try {
       setCreating(true);
-      const newThread = await createNewThread(workspaceSlug);
+      const result = await createNewThread(workspaceSlug);
 
-      await loadThreads(); // Reload list
+      console.log("New thread created:", result);
 
-      if (onNewThread) {
-        onNewThread(newThread.thread);
+      // Reload threads
+      await loadThreads();
+
+      // Notify parent
+      if (onNewThread && result.thread) {
+        onNewThread(result.thread);
       }
     } catch (error) {
       console.error("Failed to create thread:", error);
-      alert("Gagal membuat thread baru");
+      alert("Gagal membuat thread baru: " + error.message);
     } finally {
       setCreating(false);
     }
@@ -63,15 +79,42 @@ function ThreadList({
 
     try {
       await deleteThread(workspaceSlug, threadSlug);
+
+      // Reload threads
       await loadThreads();
 
       // If deleted current thread, create new one
-      if (threadSlug === currentThreadSlug && onNewThread) {
-        handleNewThread();
+      if (threadSlug === currentThreadSlug) {
+        await handleNewThread();
       }
     } catch (error) {
       console.error("Failed to delete thread:", error);
-      alert("Gagal menghapus thread");
+      alert("Gagal menghapus thread: " + error.message);
+    }
+  };
+
+  const getThreadTitle = (thread) => {
+    // Try to get a meaningful title
+    if (thread.name && thread.name !== "Thread") {
+      return thread.name;
+    }
+
+    // Use first few chars of slug as title
+    return `Chat ${thread.slug.substring(0, 8)}...`;
+  };
+
+  const getThreadDate = (thread) => {
+    if (!thread.createdAt) return "";
+
+    try {
+      return new Date(thread.createdAt).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (e) {
+      return "";
     }
   };
 
@@ -100,7 +143,7 @@ function ThreadList({
       </button>
 
       {/* Thread List */}
-      <div className="space-y-1">
+      <div className="space-y-1 max-h-96 overflow-y-auto">
         {threads.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-4">
             Belum ada percakapan
@@ -122,17 +165,11 @@ function ThreadList({
               <MessageSquare className="w-4 h-4 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {thread.name || `Thread ${thread.slug.slice(0, 8)}`}
+                  {getThreadTitle(thread)}
                 </p>
-                {thread.createdAt && (
-                  <p className="text-xs opacity-70 truncate">
-                    {new Date(thread.createdAt).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
-                )}
+                <p className="text-xs opacity-70 truncate">
+                  {getThreadDate(thread)}
+                </p>
               </div>
               <button
                 onClick={(e) => handleDeleteThread(thread.slug, e)}

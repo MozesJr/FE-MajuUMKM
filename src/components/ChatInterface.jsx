@@ -17,6 +17,7 @@ import {
   createNewThread,
   streamChatToThread,
 } from "../utils/anythingllm";
+import MessageContent from "./MessageContent";
 
 function ChatInterface() {
   const { user, logout, isAdmin } = useAuth();
@@ -235,7 +236,9 @@ function ChatInterface() {
   };
 
   const handleThreadSelect = async (thread) => {
+    console.log("Selected thread:", thread);
     setCurrentThread(thread);
+    // Messages will be loaded by useEffect
   };
 
   const handleWorkspaceChange = (workspace) => {
@@ -411,25 +414,20 @@ function ChatInterface() {
             >
               <div
                 className={`
-                max-w-[80%] rounded-2xl px-4 py-3
-                ${
-                  message.role === "user"
-                    ? "bg-purple-600 text-white"
-                    : "bg-slate-700 text-slate-100"
-                }
-              `}
+        max-w-[80%] rounded-2xl px-4 py-3
+        ${
+          message.role === "user"
+            ? "bg-purple-600 text-white"
+            : "bg-slate-700 text-slate-100"
+        }
+      `}
               >
-                <div className="prose prose-invert max-w-none">
-                  {message.content.split("\n").map((line, i) => (
-                    <p key={i} className="mb-2 last:mb-0">
-                      {line
-                        .split("**")
-                        .map((part, j) =>
-                          j % 2 === 0 ? part : <strong key={j}>{part}</strong>
-                        )}
-                    </p>
-                  ))}
+                {/* Use MessageContent component for markdown rendering */}
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <MessageContent content={message.content} />
                 </div>
+
+                {/* Streaming indicator */}
                 {message.isStreaming && (
                   <div className="flex items-center gap-1 mt-2">
                     <div
@@ -450,6 +448,7 @@ function ChatInterface() {
             </div>
           ))}
 
+          {/* Loading indicator */}
           {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="flex justify-start">
               <div className="bg-slate-700 rounded-2xl px-4 py-3">
