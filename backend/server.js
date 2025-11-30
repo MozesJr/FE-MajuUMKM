@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      "http://localhost:3000",
+      "http://localhost:8060",
       "http://localhost:5173",
       "http://localhost:3001",
     ],
@@ -28,9 +28,9 @@ const CONFIG = {
   JWT_SECRET: "majuukm-secret-key-2025", // ganti dengan secret kuat di production
   EMAIL_USER: "demianandre489@gmail.com", // ← GANTI INI
   EMAIL_PASS: "znic iscy byov bfzw", // ← GANTI INI (App Password dari Google)
-  FRONTEND_URL: "http://localhost:3000",
-  BACKEND_URL: "http://localhost:3002",
-  PORT: 3002,
+  FRONTEND_URL: "http://localhost:8060",
+  BACKEND_URL: "http://localhost:8061",
+  PORT: 8061,
 };
 
 // ===== EMAIL TRANSPORTER =====

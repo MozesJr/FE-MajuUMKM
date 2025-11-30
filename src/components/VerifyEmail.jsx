@@ -18,7 +18,7 @@ function VerifyEmail() {
 
     // Verify email
     fetch(
-      `http://localhost:3002/api/auth/verify-email?token=${encodeURIComponent(
+      `http://localhost:8061/api/auth/verify-email?token=${encodeURIComponent(
         token
       )}`
     )

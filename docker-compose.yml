@@ -8,9 +8,12 @@ services:
     container_name: chatbot_backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env   # optional: create if you need env vars
+      - ./backend/.env    # optional, can omit if not used
+    environment:
+      - NODE_ENV=development
+      - PORT=8061
     ports:
-      - "3002:3002"
+      - "8061:8061"
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -21,8 +24,11 @@ services:
       dockerfile: Dockerfile
     container_name: chatbot_frontend
     restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    command: npm run dev -- --host 0.0.0.0 --port 8060
     ports:
-      - "3000:3000"
+      - "8060:8060"
     depends_on:
       - backend
     volumes:

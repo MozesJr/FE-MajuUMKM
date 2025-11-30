@@ -97,7 +97,7 @@ npm run dev
 5. **Open browser**
 
 ```
-http://localhost:3000
+http://localhost:8060
 ```
 
 ---
